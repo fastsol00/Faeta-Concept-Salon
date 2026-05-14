@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { useAdminSession } from "@/App";
@@ -7,28 +7,29 @@ import faetaLogo from "@assets/faeta-logo.png";
 
 export default function AdminLogin() {
   const [, setLocation] = useLocation();
-  const { setSession } = useAdminSession();
+  const { session, setSession } = useAdminSession();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (session) setLocation("/admin/dashboard");
+  }, [session, setLocation]);
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError("");
     try {
-      const res = await apiRequest("POST", "/api/auth/login", { username, password });
-      if (!res.ok) {
-        const data = await res.json();
-        setError(data.error ?? "Credenziali non valide");
-        return;
-      }
+      const res = await apiRequest("POST", "/api/auth/login", { username: username.trim(), password });
       const user = await res.json();
       setSession(user);
-      setLocation("/admin/dashboard");
-    } catch {
-      setError("Errore di connessione");
+    } catch (err) {
+      const message = err instanceof Error && err.message.startsWith("401:")
+        ? "Credenziali non valide"
+        : "Errore di connessione";
+      setError(message);
     } finally {
       setLoading(false);
     }
