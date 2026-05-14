@@ -4,6 +4,7 @@ import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { BRAND_NAME } from "@/lib/brand";
+import ThemeToggle from "@/components/ThemeToggle";
 import type { Service, Hairstylist } from "@shared/schema";
 
 type Step = 1 | 2 | 3 | 4 | 5 | 6;
@@ -86,7 +87,9 @@ export default function BookingPage() {
             <h1 className="text-base font-black font-headline text-[#f5f2ea] leading-none">{BRAND_NAME}</h1>
             <span className="text-[10px] text-[#a8a29a] font-medium">Prenotazione Online</span>
           </div>
-          <div className="w-10" />
+          <div className="flex w-12 justify-end">
+            <ThemeToggle compact />
+          </div>
         </div>
         {/* Progress */}
         <div className="px-5 pb-3">

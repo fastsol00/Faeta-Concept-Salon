@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import type { AdminUser } from "@shared/schema";
 import { BRAND_ADDRESS, BRAND_HOURS, BRAND_NAME } from "@/lib/brand";
+import ThemeToggle from "@/components/ThemeToggle";
 import faetaLogo from "@assets/faeta-logo.png";
 
 const navItems = [
@@ -82,6 +83,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <p className="text-[10px] text-[#a8a29a] font-bold uppercase tracking-[0.18em] mb-1">Benvenuto</p>
           <p className="text-base font-black font-headline text-[#f5f2ea] leading-tight">Ciao, {displayName}</p>
           <p className="mt-2 text-[11px] leading-snug text-[#a8a29a]">{BRAND_HOURS}</p>
+          <div className="mt-3">
+            <ThemeToggle />
+          </div>
         </div>
       </div>
 
@@ -160,9 +164,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </div>
           <span className="font-black font-headline text-sm text-[#f5f2ea]">{shopName}</span>
         </div>
-        {newCount > 0 && (
-          <div className="bg-[#f5f2ea] text-[#080808] text-xs font-bold rounded-full px-2 py-0.5">{newCount}</div>
-        )}
+        <div className="flex items-center justify-end gap-2">
+          <ThemeToggle compact />
+          {newCount > 0 && (
+            <div className="bg-[#f5f2ea] text-[#080808] text-xs font-bold rounded-full px-2 py-0.5">{newCount}</div>
+          )}
+        </div>
       </div>
 
       {/* Main content */}

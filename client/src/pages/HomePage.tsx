@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { BRAND_ADDRESS, BRAND_HOURS, BRAND_NAME } from "@/lib/brand";
+import ThemeToggle from "@/components/ThemeToggle";
 import faetaLogo from "@assets/faeta-logo.png";
 
 export default function HomePage() {
@@ -22,7 +23,10 @@ export default function HomePage() {
     <div className="min-h-screen bg-marble flex flex-col">
       {/* Header */}
       <header className="border-b border-white/10 bg-[#101010]/80 backdrop-blur-xl shadow-sm shadow-black/20">
-        <div className="max-w-md mx-auto px-6 py-6 flex flex-col items-center">
+        <div className="max-w-md mx-auto px-6 py-6 flex flex-col items-center relative">
+          <div className="absolute right-6 top-6 z-10">
+            <ThemeToggle compact />
+          </div>
           <div className="mb-4 h-24 w-full overflow-hidden rounded-2xl border border-white/10 bg-black shadow-2xl shadow-black/30">
             <img src={faetaLogo} alt={BRAND_NAME} className="h-full w-full object-cover" />
           </div>
