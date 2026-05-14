@@ -1,0 +1,128 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Faeta Concept Salon: black marble, graphite surfaces, warm stone accents */
+    --background: 0 0% 3%;              /* #080808 */
+    --foreground: 43 31% 94%;           /* #f5f2ea */
+
+    --card: 0 0% 6%;                    /* #101010 */
+    --card-foreground: 43 31% 94%;
+
+    --popover: 0 0% 6%;
+    --popover-foreground: 43 31% 94%;
+
+    --primary: 33 10% 44%;              /* #7c7266 */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 30 5% 64%;             /* #a8a29a */
+    --secondary-foreground: 0 0% 4%;
+
+    --muted: 0 0% 9%;                   /* #161616 */
+    --muted-foreground: 30 5% 64%;
+
+    --accent: 33 9% 62%;                /* #a99f92 */
+    --accent-foreground: 0 0% 4%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 0 0% 19%;                 /* #303030 */
+    --input: 0 0% 19%;
+    --ring: 33 10% 44%;
+
+    --radius: 0.5rem;
+
+    /* custom surface tokens */
+    --surface: 0 0% 3%;
+    --surface-low: 0 0% 9%;
+    --surface-high: 0 0% 15%;
+    --surface-highest: 0 0% 19%;
+    --on-surface: 43 31% 94%;
+    --outline-variant: 27 10% 26%;
+    --primary-container: 34 14% 70%;
+    --tertiary: 33 9% 62%;
+  }
+
+  .dark {
+    --background: 185 6% 10%;
+    --foreground: 0 0% 94.5%;
+    --card: 0 0% 16%;
+    --card-foreground: 0 0% 94.5%;
+    --popover: 0 0% 16%;
+    --popover-foreground: 0 0% 94.5%;
+    --primary: 354 72% 42%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 62%;
+    --secondary-foreground: 0 0% 10%;
+    --muted: 0 0% 20%;
+    --muted-foreground: 0 0% 62%;
+    --accent: 181 100% 35%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 65% 45%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 25%;
+    --input: 0 0% 25%;
+    --ring: 354 72% 42%;
+  }
+}
+
+@layer base {
+  * { @apply border-border; }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Inter', sans-serif;
+    background:
+      linear-gradient(135deg, rgba(255,255,255,0.055) 0 1px, transparent 1px 28%),
+      linear-gradient(65deg, transparent 0 42%, rgba(255,255,255,0.035) 43%, transparent 45%),
+      linear-gradient(155deg, transparent 0 52%, rgba(124,114,102,0.12) 53%, transparent 56%),
+      #080808;
+  }
+  h1, h2, h3, h4, .font-headline {
+    font-family: 'Manrope', sans-serif;
+  }
+}
+
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+  .bg-marble {
+    background:
+      linear-gradient(135deg, rgba(255,255,255,0.065) 0 1px, transparent 1px 31%),
+      linear-gradient(72deg, transparent 0 42%, rgba(255,255,255,0.04) 43%, transparent 46%),
+      linear-gradient(155deg, transparent 0 55%, rgba(124,114,102,0.16) 56%, transparent 59%),
+      linear-gradient(180deg, #0d0d0d 0%, #050505 100%);
+  }
+
+  .marble-panel {
+    background:
+      linear-gradient(135deg, rgba(255,255,255,0.08) 0 1px, transparent 1px 36%),
+      linear-gradient(115deg, transparent 0 52%, rgba(124,114,102,0.18) 54%, transparent 58%),
+      rgba(16,16,16,0.94);
+  }
+
+  .surface-glass {
+    background: rgba(16,16,16,0.78);
+    border-color: rgba(255,255,255,0.08);
+    box-shadow: 0 24px 70px rgba(0,0,0,0.28);
+    backdrop-filter: blur(18px);
+  }
+}
+
+/* Material Symbols */
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  font-family: 'Material Symbols Outlined';
+  font-style: normal;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-smoothing: antialiased;
+}
