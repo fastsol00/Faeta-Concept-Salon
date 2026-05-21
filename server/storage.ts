@@ -1,22 +1,15 @@
-import { drizzle } from "drizzle-orm/better-sqlite3";
-import Database from "better-sqlite3";
-import { eq, and, desc, or, isNull, like } from "drizzle-orm";
 import bcrypt from "bcryptjs";
-import {
-  adminUsers, services, hairstylists, shopHours, holidays,
-  hairstylistAvailability, blockedSlots, bookings, clients,
-  InsertAdminUser, InsertService, InsertHairstylist,
-  InsertShopHours, InsertHoliday, InsertHairstylistAvailability,
-  InsertBlockedSlot, InsertBooking, InsertClient,
-  AdminUser, Service, Hairstylist, ShopHours, Holiday,
-  HairstylistAvailability, BlockedSlot, Booking, Client,
+import type {
+  AdminUser, BlockedSlot, Booking, Client, Hairstylist, HairstylistAvailability,
+  Holiday, InsertAdminUser, InsertBlockedSlot, InsertBooking, InsertClient,
+  InsertHairstylist, InsertHairstylistAvailability, InsertHoliday, InsertService,
+  InsertShopHours, Service, ShopHours,
 } from "@shared/schema";
-
-const sqlite = new Database("barbershop.db");
-const db = drizzle(sqlite);
 
 const BRAND_SHOP_NAME = "Faeta Concept Salon";
 const BRAND_SHOP_ADDRESS = "Via Cupa Fosso Del Lupo 136 NA";
+const DEFAULT_ADMIN_USERNAME = process.env.ADMIN_USERNAME || "admin";
+const DEFAULT_ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin123";
 const BRAND_SHOP_HOURS: InsertShopHours[] = [
   { dayOfWeek: 0, openTime: null, closeTime: null, isClosed: true, lunchStart: null, lunchEnd: null },
   { dayOfWeek: 1, openTime: null, closeTime: null, isClosed: true, lunchStart: null, lunchEnd: null },
@@ -27,445 +20,376 @@ const BRAND_SHOP_HOURS: InsertShopHours[] = [
   { dayOfWeek: 6, openTime: "08:30", closeTime: "20:00", isClosed: false, lunchStart: null, lunchEnd: null },
 ];
 
-// ─── Migrations ───────────────────────────────────────────────────────────────
-sqlite.exec(`
-  CREATE TABLE IF NOT EXISTS admin_users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT NOT NULL UNIQUE,
-    password_hash TEXT NOT NULL,
-    name TEXT NOT NULL,
-    display_name TEXT NOT NULL DEFAULT 'Manager',
-    shop_address TEXT NOT NULL DEFAULT 'Via Cupa Fosso Del Lupo 136 NA',
-    shop_name TEXT NOT NULL DEFAULT 'Faeta Concept Salon'
-  );
-  CREATE TABLE IF NOT EXISTS services (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    duration_minutes INTEGER NOT NULL DEFAULT 30,
-    price REAL NOT NULL DEFAULT 0,
-    active INTEGER NOT NULL DEFAULT 1
-  );
-  CREATE TABLE IF NOT EXISTS hairstylists (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    specialization TEXT NOT NULL DEFAULT '',
-    avatar TEXT NOT NULL DEFAULT '',
-    active INTEGER NOT NULL DEFAULT 1
-  );
-  CREATE TABLE IF NOT EXISTS shop_hours (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    day_of_week INTEGER NOT NULL,
-    open_time TEXT,
-    close_time TEXT,
-    is_closed INTEGER NOT NULL DEFAULT 0,
-    lunch_start TEXT,
-    lunch_end TEXT
-  );
-  CREATE TABLE IF NOT EXISTS holidays (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    date TEXT NOT NULL UNIQUE,
-    name TEXT NOT NULL DEFAULT 'Festività'
-  );
-  CREATE TABLE IF NOT EXISTS hairstylist_availability (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    hairstylist_id INTEGER NOT NULL REFERENCES hairstylists(id) ON DELETE CASCADE,
-    day_of_week INTEGER NOT NULL,
-    start_time TEXT,
-    end_time TEXT,
-    is_available INTEGER NOT NULL DEFAULT 1
-  );
-  CREATE TABLE IF NOT EXISTS blocked_slots (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    hairstylist_id INTEGER,
-    date TEXT NOT NULL,
-    start_time TEXT,
-    end_time TEXT,
-    reason TEXT
-  );
-  CREATE TABLE IF NOT EXISTS clients (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    first_name TEXT NOT NULL,
-    last_name TEXT NOT NULL,
-    phone TEXT NOT NULL,
-    email TEXT,
-    notes TEXT,
-    created_at INTEGER NOT NULL,
-    total_bookings INTEGER NOT NULL DEFAULT 0
-  );
-  CREATE TABLE IF NOT EXISTS bookings (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    booking_code TEXT NOT NULL UNIQUE,
-    first_name TEXT NOT NULL,
-    last_name TEXT NOT NULL,
-    phone TEXT NOT NULL DEFAULT '',
-    client_id INTEGER,
-    service_id INTEGER NOT NULL REFERENCES services(id),
-    hairstylist_id INTEGER NOT NULL REFERENCES hairstylists(id),
-    date TEXT NOT NULL,
-    time TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'confirmed',
-    notes TEXT,
-    created_at INTEGER NOT NULL,
-    is_new INTEGER NOT NULL DEFAULT 1
-  );
-`);
+type FilterValue = string | number | boolean | null;
 
-// ─── Alter existing tables (add new columns if missing) ───────────────────────
-const tryAlter = (sql: string) => { try { sqlite.exec(sql); } catch (_) {} };
-tryAlter("ALTER TABLE admin_users ADD COLUMN display_name TEXT NOT NULL DEFAULT 'Manager'");
-tryAlter("ALTER TABLE admin_users ADD COLUMN shop_address TEXT NOT NULL DEFAULT 'Via Cupa Fosso Del Lupo 136 NA'");
-tryAlter("ALTER TABLE admin_users ADD COLUMN shop_name TEXT NOT NULL DEFAULT 'Faeta Concept Salon'");
-tryAlter("ALTER TABLE shop_hours ADD COLUMN lunch_start TEXT");
-tryAlter("ALTER TABLE shop_hours ADD COLUMN lunch_end TEXT");
-tryAlter("ALTER TABLE bookings ADD COLUMN booking_code TEXT");
-tryAlter("ALTER TABLE bookings ADD COLUMN phone TEXT NOT NULL DEFAULT ''");
-tryAlter("ALTER TABLE bookings ADD COLUMN client_id INTEGER");
-
-// ─── Booking code generator ───────────────────────────────────────────────────
-function generateBookingCode(): string {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ"; // skip I and O to avoid confusion
-  let code = "";
-  for (let i = 0; i < 6; i++) {
-    code += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return code;
-}
-
-function uniqueBookingCode(): string {
-  let code = generateBookingCode();
-  let attempts = 0;
-  while (attempts < 100) {
-    const existing = db.select().from(bookings).where(eq(bookings.bookingCode, code)).get();
-    if (!existing) return code;
-    code = generateBookingCode();
-    attempts++;
-  }
-  // Fallback: prefix + random 4
-  return "G" + Date.now().toString(36).slice(-5).toUpperCase();
-}
-
-// Backfill existing bookings without codes
-const noCodeBookings = db.select().from(bookings).all().filter(b => !b.bookingCode);
-for (const b of noCodeBookings) {
-  db.update(bookings).set({ bookingCode: uniqueBookingCode() }).where(eq(bookings.id, b.id)).run();
-}
-
-// ─── Seed ─────────────────────────────────────────────────────────────────────
-function seed() {
-  const existingAdmin = db.select().from(adminUsers).get();
-  if (existingAdmin) return;
-
-  const hash = bcrypt.hashSync("admin123", 10);
-  db.insert(adminUsers).values({
-    username: "admin", passwordHash: hash, name: "Manager",
-    displayName: "Manager", shopAddress: BRAND_SHOP_ADDRESS,
-    shopName: BRAND_SHOP_NAME,
-  }).run();
-
-  db.insert(services).values([
-    { name: "Taglio", durationMinutes: 30, price: 25, active: true },
-    { name: "Barba", durationMinutes: 20, price: 15, active: true },
-    { name: "Taglio + Barba", durationMinutes: 50, price: 35, active: true },
-    { name: "Rasatura", durationMinutes: 30, price: 20, active: true },
-    { name: "Styling", durationMinutes: 20, price: 15, active: true },
-    { name: "Altro", durationMinutes: 30, price: 20, active: true },
-  ]).run();
-
-  db.insert(hairstylists).values([
-    { name: "Marco Santini", specialization: "Taglio Classico & Barba", avatar: "", active: true },
-    { name: "Luca Ferrari", specialization: "Styling Moderno", avatar: "", active: true },
-    { name: "Sara Longhi", specialization: "Colorazione & Trattamenti", avatar: "", active: true },
-  ]).run();
-
-  const shopDefaults = BRAND_SHOP_HOURS;
-  for (const h of shopDefaults) db.insert(shopHours).values(h).run();
-
-  const stylistIds = db.select().from(hairstylists).all().map(s => s.id);
-  for (const sid of stylistIds) {
-    for (const h of shopDefaults) {
-      db.insert(hairstylistAvailability).values({
-        hairstylistId: sid, dayOfWeek: h.dayOfWeek,
-        startTime: h.openTime, endTime: h.closeTime, isAvailable: !h.isClosed,
-      }).run();
-    }
-  }
-
-  // Sample clients
-  db.insert(clients).values([
-    { firstName: "Giulia", lastName: "Rossi", phone: "3331234567", email: "giulia@email.com", createdAt: Date.now() - 86400000 * 10, totalBookings: 2 },
-    { firstName: "Alessandro", lastName: "Bianchi", phone: "3337654321", email: "alex@email.com", createdAt: Date.now() - 86400000 * 5, totalBookings: 1 },
-    { firstName: "Matteo", lastName: "Neri", phone: "3339876543", email: null, createdAt: Date.now() - 86400000 * 3, totalBookings: 1 },
-  ]).run();
-
-  const today = new Date();
-  const fmt = (d: Date) => d.toISOString().split("T")[0];
-  const todayStr = fmt(today);
-  const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1);
-  const tomorrowStr = fmt(tomorrow);
-
-  db.insert(bookings).values([
-    { bookingCode: uniqueBookingCode(), firstName: "Giulia", lastName: "Rossi", phone: "3331234567", clientId: 1, serviceId: 3, hairstylistId: 1, date: todayStr, time: "10:00", status: "confirmed", createdAt: Date.now() - 3600000, isNew: true },
-    { bookingCode: uniqueBookingCode(), firstName: "Alessandro", lastName: "Bianchi", phone: "3337654321", clientId: 2, serviceId: 2, hairstylistId: 2, date: todayStr, time: "11:30", status: "confirmed", createdAt: Date.now() - 7200000, isNew: false },
-    { bookingCode: uniqueBookingCode(), firstName: "Matteo", lastName: "Neri", phone: "3339876543", clientId: 3, serviceId: 1, hairstylistId: 1, date: todayStr, time: "14:00", status: "completed", createdAt: Date.now() - 86400000, isNew: false },
-    { bookingCode: uniqueBookingCode(), firstName: "Chiara", lastName: "Verdi", phone: "3335551234", serviceId: 5, hairstylistId: 3, date: tomorrowStr, time: "09:30", status: "confirmed", createdAt: Date.now() - 1800000, isNew: true },
-    { bookingCode: uniqueBookingCode(), firstName: "Roberto", lastName: "Mancini", phone: "3334441234", serviceId: 1, hairstylistId: 2, date: tomorrowStr, time: "15:00", status: "confirmed", createdAt: Date.now() - 900000, isNew: false },
-  ]).run();
-}
-seed();
-
-function applyBrandDefaults() {
-  sqlite.prepare(`
-    UPDATE admin_users
-    SET shop_name = ?,
-        shop_address = ?
-  `).run(BRAND_SHOP_NAME, BRAND_SHOP_ADDRESS);
-
-  const currentHours = db.select().from(shopHours).all();
-  const hasLegacyHours = currentHours.length !== 7 || currentHours.some(h =>
-    h.openTime === "09:00" ||
-    h.closeTime === "19:00" ||
-    (h.dayOfWeek === 0 && !h.isClosed) ||
-    (h.dayOfWeek >= 2 && h.dayOfWeek <= 6 && (h.isClosed || h.openTime !== "08:30" || h.closeTime !== "20:00"))
-  );
-  if (hasLegacyHours) {
-    db.delete(shopHours).run();
-    for (const h of BRAND_SHOP_HOURS) db.insert(shopHours).values(h).run();
-  }
-
-  const availability = db.select().from(hairstylistAvailability).all();
-  const hasLegacyAvailability = availability.length === 0 || availability.some(a =>
-    a.startTime === "09:00" ||
-    a.endTime === "19:00" ||
-    (a.dayOfWeek === 0 && a.isAvailable) ||
-    (a.dayOfWeek >= 2 && a.dayOfWeek <= 6 && (!a.isAvailable || a.startTime !== "08:30" || a.endTime !== "20:00"))
-  );
-  if (hasLegacyAvailability) {
-    const stylistIds = db.select().from(hairstylists).all().map(s => s.id);
-    db.delete(hairstylistAvailability).run();
-    for (const sid of stylistIds) {
-      for (const h of BRAND_SHOP_HOURS) {
-        db.insert(hairstylistAvailability).values({
-          hairstylistId: sid,
-          dayOfWeek: h.dayOfWeek,
-          startTime: h.openTime,
-          endTime: h.closeTime,
-          isAvailable: !h.isClosed,
-        }).run();
-      }
-    }
-  }
-}
-applyBrandDefaults();
-
-// ─── Storage Interface ────────────────────────────────────────────────────────
 export interface IStorage {
-  // Auth
-  getAdminByUsername(username: string): AdminUser | undefined;
-  getAdminById(id: number): AdminUser | undefined;
-  updateAdmin(id: number, data: Partial<InsertAdminUser>): AdminUser | undefined;
-  // Services
-  getServices(): Service[];
-  createService(data: InsertService): Service;
-  updateService(id: number, data: Partial<InsertService>): Service | undefined;
-  deleteService(id: number): void;
-  // Hairstylists
-  getHairstylists(): Hairstylist[];
-  getHairstylistById(id: number): Hairstylist | undefined;
-  createHairstylist(data: InsertHairstylist): Hairstylist;
-  updateHairstylist(id: number, data: Partial<InsertHairstylist>): Hairstylist | undefined;
-  deleteHairstylist(id: number): void;
-  // Shop hours
-  getShopHours(): ShopHours[];
-  upsertShopHours(data: InsertShopHours[]): ShopHours[];
-  // Holidays
-  getHolidays(): Holiday[];
-  createHoliday(data: InsertHoliday): Holiday;
-  deleteHoliday(id: number): void;
-  // Hairstylist availability
-  getHairstylistAvailability(hairstylistId: number): HairstylistAvailability[];
-  upsertHairstylistAvailability(hairstylistId: number, data: InsertHairstylistAvailability[]): HairstylistAvailability[];
-  // Blocked slots
-  getBlockedSlots(hairstylistId?: number, date?: string): BlockedSlot[];
-  createBlockedSlot(data: InsertBlockedSlot): BlockedSlot;
-  deleteBlockedSlot(id: number): void;
-  // Clients
-  getClients(): Client[];
-  getClientById(id: number): Client | undefined;
-  findClientByPhone(phone: string): Client | undefined;
-  findClientByEmail(email: string): Client | undefined;
-  upsertClient(data: InsertClient): Client;
-  updateClient(id: number, data: Partial<InsertClient>): Client | undefined;
-  deleteClient(id: number): void;
-  // Bookings
-  getBookings(filters?: { date?: string; hairstylistId?: number; serviceId?: number; status?: string }): Booking[];
-  getBookingById(id: number): Booking | undefined;
-  getBookingByCode(code: string): Booking | undefined;
-  createBooking(data: InsertBooking & { phone: string }): Booking;
-  updateBooking(id: number, data: Partial<Booking>): Booking | undefined;
-  deleteBooking(id: number): void;
-  markBookingsRead(): void;
-  getNewBookingsCount(): number;
-  // Available slots
-  getAvailableSlots(hairstylistId: number, date: string, durationMinutes: number, excludeBookingId?: number): string[];
+  ensureReady(): Promise<void>;
+  getAdminByUsername(username: string): Promise<AdminUser | undefined>;
+  getAdminById(id: number): Promise<AdminUser | undefined>;
+  updateAdmin(id: number, data: Partial<InsertAdminUser>): Promise<AdminUser | undefined>;
+  getServices(): Promise<Service[]>;
+  createService(data: InsertService): Promise<Service>;
+  updateService(id: number, data: Partial<InsertService>): Promise<Service | undefined>;
+  deleteService(id: number): Promise<void>;
+  getHairstylists(): Promise<Hairstylist[]>;
+  getHairstylistById(id: number): Promise<Hairstylist | undefined>;
+  createHairstylist(data: InsertHairstylist): Promise<Hairstylist>;
+  updateHairstylist(id: number, data: Partial<InsertHairstylist>): Promise<Hairstylist | undefined>;
+  deleteHairstylist(id: number): Promise<void>;
+  getShopHours(): Promise<ShopHours[]>;
+  upsertShopHours(data: InsertShopHours[]): Promise<ShopHours[]>;
+  getHolidays(): Promise<Holiday[]>;
+  createHoliday(data: InsertHoliday): Promise<Holiday>;
+  deleteHoliday(id: number): Promise<void>;
+  getHairstylistAvailability(hairstylistId: number): Promise<HairstylistAvailability[]>;
+  upsertHairstylistAvailability(hairstylistId: number, data: InsertHairstylistAvailability[]): Promise<HairstylistAvailability[]>;
+  getBlockedSlots(hairstylistId?: number, date?: string): Promise<BlockedSlot[]>;
+  createBlockedSlot(data: InsertBlockedSlot): Promise<BlockedSlot>;
+  deleteBlockedSlot(id: number): Promise<void>;
+  getClients(): Promise<Client[]>;
+  getClientById(id: number): Promise<Client | undefined>;
+  findClientByPhone(phone: string): Promise<Client | undefined>;
+  findClientByEmail(email: string): Promise<Client | undefined>;
+  upsertClient(data: InsertClient): Promise<Client>;
+  updateClient(id: number, data: Partial<InsertClient>): Promise<Client | undefined>;
+  deleteClient(id: number): Promise<void>;
+  getBookings(filters?: { date?: string; hairstylistId?: number; serviceId?: number; status?: string }): Promise<Booking[]>;
+  getBookingById(id: number): Promise<Booking | undefined>;
+  getBookingByCode(code: string): Promise<Booking | undefined>;
+  createBooking(data: InsertBooking & { phone: string }): Promise<Booking>;
+  updateBooking(id: number, data: Partial<Booking>): Promise<Booking | undefined>;
+  deleteBooking(id: number): Promise<void>;
+  markBookingsRead(): Promise<void>;
+  getNewBookingsCount(): Promise<number>;
+  getAvailableSlots(hairstylistId: number, date: string, durationMinutes: number, excludeBookingId?: number): Promise<string[]>;
 }
 
-export class SqliteStorage implements IStorage {
-  getAdminByUsername(username: string) {
-    return db.select().from(adminUsers).where(eq(adminUsers.username, username)).get();
-  }
-  getAdminById(id: number) {
-    return db.select().from(adminUsers).where(eq(adminUsers.id, id)).get();
-  }
-  updateAdmin(id: number, data: Partial<InsertAdminUser>) {
-    return db.update(adminUsers).set(data).where(eq(adminUsers.id, id)).returning().get();
+function requiredEnv(name: string) {
+  const value = process.env[name];
+  if (!value) throw new Error(`${name} mancante. Configura Supabase prima di avviare il server.`);
+  return value;
+}
+
+function toCamel(row: any): any {
+  if (!row || typeof row !== "object") return row;
+  return {
+    ...row,
+    passwordHash: row.password_hash,
+    displayName: row.display_name,
+    shopAddress: row.shop_address,
+    shopName: row.shop_name,
+    durationMinutes: row.duration_minutes,
+    dayOfWeek: row.day_of_week,
+    openTime: row.open_time,
+    closeTime: row.close_time,
+    isClosed: row.is_closed,
+    lunchStart: row.lunch_start,
+    lunchEnd: row.lunch_end,
+    hairstylistId: row.hairstylist_id,
+    startTime: row.start_time,
+    endTime: row.end_time,
+    isAvailable: row.is_available,
+    firstName: row.first_name,
+    lastName: row.last_name,
+    createdAt: row.created_at,
+    totalBookings: row.total_bookings,
+    bookingCode: row.booking_code,
+    clientId: row.client_id,
+    serviceId: row.service_id,
+    isNew: row.is_new,
+  };
+}
+
+function toSnake(data: Record<string, any>): Record<string, any> {
+  const map: Record<string, string> = {
+    passwordHash: "password_hash",
+    displayName: "display_name",
+    shopAddress: "shop_address",
+    shopName: "shop_name",
+    durationMinutes: "duration_minutes",
+    dayOfWeek: "day_of_week",
+    openTime: "open_time",
+    closeTime: "close_time",
+    isClosed: "is_closed",
+    lunchStart: "lunch_start",
+    lunchEnd: "lunch_end",
+    hairstylistId: "hairstylist_id",
+    startTime: "start_time",
+    endTime: "end_time",
+    isAvailable: "is_available",
+    firstName: "first_name",
+    lastName: "last_name",
+    createdAt: "created_at",
+    totalBookings: "total_bookings",
+    bookingCode: "booking_code",
+    clientId: "client_id",
+    serviceId: "service_id",
+    isNew: "is_new",
+  };
+  return Object.fromEntries(
+    Object.entries(data)
+      .filter(([, value]) => value !== undefined)
+      .map(([key, value]) => [map[key] ?? key, value]),
+  );
+}
+
+function generateBookingCode(): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+  return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+}
+
+function toMins(t: string) {
+  const [h, m] = t.split(":").map(Number);
+  return h * 60 + m;
+}
+
+function toTime(m: number) {
+  return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+}
+
+class SupabaseRest {
+  private readonly baseUrl: string;
+  private readonly key: string;
+
+  constructor() {
+    this.baseUrl = requiredEnv("SUPABASE_URL").replace(/\/$/, "");
+    this.key = requiredEnv("SUPABASE_SERVICE_ROLE_KEY");
   }
 
-  getServices() { return db.select().from(services).all(); }
-  createService(data: InsertService) { return db.insert(services).values(data).returning().get()!; }
-  updateService(id: number, data: Partial<InsertService>) {
-    return db.update(services).set(data).where(eq(services.id, id)).returning().get();
-  }
-  deleteService(id: number) { db.delete(services).where(eq(services.id, id)).run(); }
-
-  getHairstylists() { return db.select().from(hairstylists).all(); }
-  getHairstylistById(id: number) { return db.select().from(hairstylists).where(eq(hairstylists.id, id)).get(); }
-  createHairstylist(data: InsertHairstylist) { return db.insert(hairstylists).values(data).returning().get()!; }
-  updateHairstylist(id: number, data: Partial<InsertHairstylist>) {
-    return db.update(hairstylists).set(data).where(eq(hairstylists.id, id)).returning().get();
-  }
-  deleteHairstylist(id: number) { db.delete(hairstylists).where(eq(hairstylists.id, id)).run(); }
-
-  getShopHours() { return db.select().from(shopHours).all(); }
-  upsertShopHours(data: InsertShopHours[]) {
-    db.delete(shopHours).run();
-    for (const h of data) db.insert(shopHours).values(h).run();
-    return db.select().from(shopHours).all();
+  private url(table: string, params?: URLSearchParams) {
+    const query = params?.toString();
+    return `${this.baseUrl}/rest/v1/${table}${query ? `?${query}` : ""}`;
   }
 
-  getHolidays() { return db.select().from(holidays).all(); }
-  createHoliday(data: InsertHoliday) { return db.insert(holidays).values(data).returning().get()!; }
-  deleteHoliday(id: number) { db.delete(holidays).where(eq(holidays.id, id)).run(); }
+  private async request<T>(table: string, init: RequestInit = {}, params?: URLSearchParams): Promise<T> {
+    const res = await fetch(this.url(table, params), {
+      ...init,
+      headers: {
+        apikey: this.key,
+        Authorization: `Bearer ${this.key}`,
+        "Content-Type": "application/json",
+        ...(init.headers ?? {}),
+      },
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Supabase ${res.status}: ${text}`);
+    }
+    if (res.status === 204) return undefined as T;
+    return await res.json() as T;
+  }
+
+  async select<T>(table: string, filters: Record<string, FilterValue> = {}, order?: string): Promise<T[]> {
+    const params = new URLSearchParams({ select: "*" });
+    for (const [key, value] of Object.entries(filters)) {
+      if (value === null) params.set(key, "is.null");
+      else params.set(key, `eq.${String(value)}`);
+    }
+    if (order) params.set("order", order);
+    const rows = await this.request<any[]>(table, { method: "GET" }, params);
+    return rows.map(toCamel) as T[];
+  }
+
+  async selectOne<T>(table: string, filters: Record<string, FilterValue>): Promise<T | undefined> {
+    const params = new URLSearchParams({ select: "*", limit: "1" });
+    for (const [key, value] of Object.entries(filters)) {
+      if (value === null) params.set(key, "is.null");
+      else params.set(key, `eq.${String(value)}`);
+    }
+    const rows = await this.request<any[]>(table, { method: "GET" }, params);
+    return rows[0] ? toCamel(rows[0]) as T : undefined;
+  }
+
+  async insert<T>(table: string, data: Record<string, any>): Promise<T> {
+    const rows = await this.request<any[]>(table, {
+      method: "POST",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify(toSnake(data)),
+    });
+    return toCamel(rows[0]) as T;
+  }
+
+  async insertMany<T>(table: string, data: Record<string, any>[]): Promise<T[]> {
+    const rows = await this.request<any[]>(table, {
+      method: "POST",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify(data.map(toSnake)),
+    });
+    return rows.map(toCamel) as T[];
+  }
+
+  async update<T>(table: string, filters: Record<string, FilterValue>, data: Record<string, any>): Promise<T | undefined> {
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries(filters)) params.set(key, `eq.${String(value)}`);
+    const rows = await this.request<any[]>(table, {
+      method: "PATCH",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify(toSnake(data)),
+    }, params);
+    return rows[0] ? toCamel(rows[0]) as T : undefined;
+  }
+
+  async delete(table: string, filters: Record<string, FilterValue>): Promise<void> {
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries(filters)) params.set(key, `eq.${String(value)}`);
+    await this.request<void>(table, { method: "DELETE", headers: { Prefer: "return=minimal" } }, params);
+  }
+
+  async deleteAll(table: string): Promise<void> {
+    const params = new URLSearchParams({ id: "gte.0" });
+    await this.request<void>(table, { method: "DELETE", headers: { Prefer: "return=minimal" } }, params);
+  }
+
+  async blocked(hairstylistId?: number, date?: string): Promise<BlockedSlot[]> {
+    const params = new URLSearchParams({ select: "*" });
+    if (date) params.set("date", `eq.${date}`);
+    if (hairstylistId !== undefined) params.set("or", `(hairstylist_id.eq.${hairstylistId},hairstylist_id.is.null)`);
+    const rows = await this.request<any[]>("blocked_slots", { method: "GET" }, params);
+    return rows.map(toCamel) as BlockedSlot[];
+  }
+}
+
+export class SupabaseStorage implements IStorage {
+  private readonly supabase = new SupabaseRest();
+
+  async ensureReady() {
+    const admin = await this.getAdminByUsername(DEFAULT_ADMIN_USERNAME);
+    if (!admin) {
+      await this.supabase.insert<AdminUser>("admin_users", {
+        username: DEFAULT_ADMIN_USERNAME,
+        passwordHash: bcrypt.hashSync(DEFAULT_ADMIN_PASSWORD, 10),
+        name: "Manager",
+        displayName: "Manager",
+        shopAddress: BRAND_SHOP_ADDRESS,
+        shopName: BRAND_SHOP_NAME,
+      });
+    }
+    if ((await this.getShopHours()).length === 0) {
+      await this.supabase.insertMany<ShopHours>("shop_hours", BRAND_SHOP_HOURS);
+    }
+  }
+
+  getAdminByUsername(username: string) { return this.supabase.selectOne<AdminUser>("admin_users", { username }); }
+  getAdminById(id: number) { return this.supabase.selectOne<AdminUser>("admin_users", { id }); }
+  updateAdmin(id: number, data: Partial<InsertAdminUser>) { return this.supabase.update<AdminUser>("admin_users", { id }, data); }
+
+  getServices() { return this.supabase.select<Service>("services"); }
+  createService(data: InsertService) { return this.supabase.insert<Service>("services", data); }
+  updateService(id: number, data: Partial<InsertService>) { return this.supabase.update<Service>("services", { id }, data); }
+  deleteService(id: number) { return this.supabase.delete("services", { id }); }
+
+  getHairstylists() { return this.supabase.select<Hairstylist>("hairstylists"); }
+  getHairstylistById(id: number) { return this.supabase.selectOne<Hairstylist>("hairstylists", { id }); }
+  createHairstylist(data: InsertHairstylist) { return this.supabase.insert<Hairstylist>("hairstylists", data); }
+  updateHairstylist(id: number, data: Partial<InsertHairstylist>) { return this.supabase.update<Hairstylist>("hairstylists", { id }, data); }
+  deleteHairstylist(id: number) { return this.supabase.delete("hairstylists", { id }); }
+
+  getShopHours() { return this.supabase.select<ShopHours>("shop_hours", {}, "day_of_week.asc"); }
+  async upsertShopHours(data: InsertShopHours[]) {
+    await this.supabase.deleteAll("shop_hours");
+    await this.supabase.insertMany<ShopHours>("shop_hours", data);
+    return this.getShopHours();
+  }
+
+  getHolidays() { return this.supabase.select<Holiday>("holidays", {}, "date.asc"); }
+  createHoliday(data: InsertHoliday) { return this.supabase.insert<Holiday>("holidays", data); }
+  deleteHoliday(id: number) { return this.supabase.delete("holidays", { id }); }
 
   getHairstylistAvailability(hairstylistId: number) {
-    return db.select().from(hairstylistAvailability)
-      .where(eq(hairstylistAvailability.hairstylistId, hairstylistId)).all();
+    return this.supabase.select<HairstylistAvailability>("hairstylist_availability", { hairstylist_id: hairstylistId }, "day_of_week.asc");
   }
-  upsertHairstylistAvailability(hairstylistId: number, data: InsertHairstylistAvailability[]) {
-    db.delete(hairstylistAvailability).where(eq(hairstylistAvailability.hairstylistId, hairstylistId)).run();
-    for (const a of data) db.insert(hairstylistAvailability).values(a).run();
+  async upsertHairstylistAvailability(hairstylistId: number, data: InsertHairstylistAvailability[]) {
+    const existing = await this.getHairstylistAvailability(hairstylistId);
+    for (const item of existing) await this.supabase.delete("hairstylist_availability", { id: item.id });
+    if (data.length) await this.supabase.insertMany<HairstylistAvailability>("hairstylist_availability", data);
     return this.getHairstylistAvailability(hairstylistId);
   }
 
-  getBlockedSlots(hairstylistId?: number, date?: string) {
-    let q = db.select().from(blockedSlots) as any;
-    const conditions: any[] = [];
-    if (hairstylistId !== undefined) conditions.push(or(eq(blockedSlots.hairstylistId, hairstylistId), isNull(blockedSlots.hairstylistId)));
-    if (date) conditions.push(eq(blockedSlots.date, date));
-    if (conditions.length > 0) q = q.where(and(...conditions));
-    return q.all();
-  }
-  createBlockedSlot(data: InsertBlockedSlot) { return db.insert(blockedSlots).values(data).returning().get()!; }
-  deleteBlockedSlot(id: number) { db.delete(blockedSlots).where(eq(blockedSlots.id, id)).run(); }
+  getBlockedSlots(hairstylistId?: number, date?: string) { return this.supabase.blocked(hairstylistId, date); }
+  createBlockedSlot(data: InsertBlockedSlot) { return this.supabase.insert<BlockedSlot>("blocked_slots", data); }
+  deleteBlockedSlot(id: number) { return this.supabase.delete("blocked_slots", { id }); }
 
-  getClients() { return db.select().from(clients).orderBy(desc(clients.createdAt)).all(); }
-  getClientById(id: number) { return db.select().from(clients).where(eq(clients.id, id)).get(); }
-  findClientByPhone(phone: string) { return db.select().from(clients).where(eq(clients.phone, phone)).get(); }
-  findClientByEmail(email: string) { return db.select().from(clients).where(eq(clients.email, email)).get(); }
-  upsertClient(data: InsertClient): Client {
-    // Dedup by phone first, then email
-    let existing = this.findClientByPhone(data.phone);
-    if (!existing && data.email) existing = this.findClientByEmail(data.email);
+  getClients() { return this.supabase.select<Client>("clients", {}, "created_at.desc"); }
+  getClientById(id: number) { return this.supabase.selectOne<Client>("clients", { id }); }
+  findClientByPhone(phone: string) { return this.supabase.selectOne<Client>("clients", { phone }); }
+  findClientByEmail(email: string) { return this.supabase.selectOne<Client>("clients", { email }); }
+  async upsertClient(data: InsertClient): Promise<Client> {
+    let existing = await this.findClientByPhone(data.phone);
+    if (!existing && data.email) existing = await this.findClientByEmail(data.email);
     if (existing) {
-      // Update name if changed, increment bookings
-      const updated = db.update(clients).set({
+      return await this.supabase.update<Client>("clients", { id: existing.id }, {
         firstName: data.firstName,
         lastName: data.lastName,
         totalBookings: existing.totalBookings + 1,
         email: data.email ?? existing.email,
-      }).where(eq(clients.id, existing.id)).returning().get()!;
-      return updated;
+        notes: data.notes ?? existing.notes,
+      }) as Client;
     }
-    return db.insert(clients).values({ ...data, createdAt: Date.now(), totalBookings: 1 }).returning().get()!;
+    return this.supabase.insert<Client>("clients", { ...data, createdAt: Date.now(), totalBookings: 1 });
   }
-  updateClient(id: number, data: Partial<InsertClient>) {
-    return db.update(clients).set(data).where(eq(clients.id, id)).returning().get();
-  }
-  deleteClient(id: number) { db.delete(clients).where(eq(clients.id, id)).run(); }
+  updateClient(id: number, data: Partial<InsertClient>) { return this.supabase.update<Client>("clients", { id }, data); }
+  deleteClient(id: number) { return this.supabase.delete("clients", { id }); }
 
-  getBookings(filters?: { date?: string; hairstylistId?: number; serviceId?: number; status?: string }) {
-    let q = db.select().from(bookings) as any;
-    const conditions: any[] = [];
-    if (filters?.date) conditions.push(eq(bookings.date, filters.date));
-    if (filters?.hairstylistId) conditions.push(eq(bookings.hairstylistId, filters.hairstylistId));
-    if (filters?.serviceId) conditions.push(eq(bookings.serviceId, filters.serviceId));
-    if (filters?.status) conditions.push(eq(bookings.status, filters.status));
-    if (conditions.length > 0) q = q.where(and(...conditions));
-    return q.orderBy(desc(bookings.createdAt)).all();
+  async getBookings(filters?: { date?: string; hairstylistId?: number; serviceId?: number; status?: string }) {
+    return this.supabase.select<Booking>("bookings", {
+      ...(filters?.date ? { date: filters.date } : {}),
+      ...(filters?.hairstylistId ? { hairstylist_id: filters.hairstylistId } : {}),
+      ...(filters?.serviceId ? { service_id: filters.serviceId } : {}),
+      ...(filters?.status ? { status: filters.status } : {}),
+    }, "created_at.desc");
   }
-  getBookingById(id: number) { return db.select().from(bookings).where(eq(bookings.id, id)).get(); }
-  getBookingByCode(code: string) { return db.select().from(bookings).where(eq(bookings.bookingCode, code.toUpperCase())).get(); }
+  getBookingById(id: number) { return this.supabase.selectOne<Booking>("bookings", { id }); }
+  getBookingByCode(code: string) { return this.supabase.selectOne<Booking>("bookings", { booking_code: code.toUpperCase() }); }
 
-  createBooking(data: InsertBooking & { phone: string }): Booking {
-    const code = uniqueBookingCode();
-    // Upsert client
-    const client = this.upsertClient({
+  async createBooking(data: InsertBooking & { phone: string }): Promise<Booking> {
+    const client = await this.upsertClient({
       firstName: data.firstName,
       lastName: data.lastName,
       phone: data.phone,
       email: undefined,
+      notes: undefined,
     });
-    return db.insert(bookings).values({
+    let bookingCode = generateBookingCode();
+    for (let i = 0; i < 100 && await this.getBookingByCode(bookingCode); i++) bookingCode = generateBookingCode();
+    return this.supabase.insert<Booking>("bookings", {
       ...data,
-      bookingCode: code,
+      bookingCode,
       clientId: client.id,
       createdAt: Date.now(),
       isNew: true,
-    }).returning().get()!;
+    });
   }
-
-  updateBooking(id: number, data: Partial<Booking>) {
-    return db.update(bookings).set(data).where(eq(bookings.id, id)).returning().get();
+  updateBooking(id: number, data: Partial<Booking>) { return this.supabase.update<Booking>("bookings", { id }, data); }
+  deleteBooking(id: number) { return this.supabase.delete("bookings", { id }); }
+  async markBookingsRead() {
+    const newBookings = await this.getBookings();
+    for (const booking of newBookings.filter(b => b.isNew)) {
+      await this.updateBooking(booking.id, { isNew: false });
+    }
   }
-  deleteBooking(id: number) { db.delete(bookings).where(eq(bookings.id, id)).run(); }
-  markBookingsRead() { db.update(bookings).set({ isNew: false }).run(); }
-  getNewBookingsCount() { return db.select().from(bookings).all().filter(b => b.isNew).length; }
+  async getNewBookingsCount() { return (await this.getBookings()).filter(b => b.isNew).length; }
 
-  getAvailableSlots(hairstylistId: number, date: string, durationMinutes: number, excludeBookingId?: number): string[] {
+  async getAvailableSlots(hairstylistId: number, date: string, durationMinutes: number, excludeBookingId?: number): Promise<string[]> {
     const d = new Date(date + "T12:00:00");
     const dow = d.getDay();
-    if (dow === 1) return [];
+    if (dow === 0 || dow === 1) return [];
+    if (await this.supabase.selectOne<Holiday>("holidays", { date })) return [];
 
-    // Check holiday
-    const holiday = db.select().from(holidays).where(eq(holidays.date, date)).get();
-    if (holiday) return [];
-
-    const sh = db.select().from(shopHours).where(eq(shopHours.dayOfWeek, dow)).get();
+    const sh = (await this.getShopHours()).find(h => h.dayOfWeek === dow);
     if (!sh || sh.isClosed || !sh.openTime || !sh.closeTime) return [];
 
-    const ha = db.select().from(hairstylistAvailability)
-      .where(and(
-        eq(hairstylistAvailability.hairstylistId, hairstylistId),
-        eq(hairstylistAvailability.dayOfWeek, dow)
-      )).get();
+    const ha = (await this.getHairstylistAvailability(hairstylistId)).find(a => a.dayOfWeek === dow);
     if (!ha || !ha.isAvailable || !ha.startTime || !ha.endTime) return [];
-
-    const toMins = (t: string) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
-    const toTime = (m: number) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
 
     const start = Math.max(toMins(sh.openTime), toMins(ha.startTime));
     const end = Math.min(toMins(sh.closeTime), toMins(ha.endTime));
-
-    // Pausa pranzo (se configurata per questo giorno)
     const lunchStart = sh.lunchStart ? toMins(sh.lunchStart) : null;
     const lunchEnd = sh.lunchEnd ? toMins(sh.lunchEnd) : null;
-
-    const existingBookings = db.select().from(bookings)
-      .where(and(eq(bookings.hairstylistId, hairstylistId), eq(bookings.date, date))).all()
+    const existingBookings = (await this.getBookings({ hairstylistId, date }))
       .filter(b => b.status !== "cancelled" && b.id !== excludeBookingId);
-
-    const allServices = db.select().from(services).all();
+    const allServices = await this.getServices();
     const serviceMap = new Map(allServices.map(s => [s.id, s]));
-    const blocked = this.getBlockedSlots(hairstylistId, date);
+    const blocked = await this.getBlockedSlots(hairstylistId, date);
 
     const slots: string[] = [];
     for (let t = start; t + durationMinutes <= end; t += 30) {
@@ -478,21 +402,11 @@ export class SqliteStorage implements IStorage {
         const bs = toMins(booking.time);
         if (slotStart < bs + dur && slotEnd > bs) { conflict = true; break; }
       }
-      if (conflict) continue;
-
-      // Pausa pranzo: salta se lo slot si sovrappone con la pausa
-      if (!conflict && lunchStart !== null && lunchEnd !== null) {
-        if (slotStart < lunchEnd && slotEnd > lunchStart) conflict = true;
-      }
-
+      if (!conflict && lunchStart !== null && lunchEnd !== null && slotStart < lunchEnd && slotEnd > lunchStart) conflict = true;
       for (const blk of blocked) {
         if (conflict) break;
         if (!blk.startTime && !blk.endTime) { conflict = true; break; }
-        if (blk.startTime && blk.endTime) {
-          const bs = toMins(blk.startTime);
-          const be = toMins(blk.endTime);
-          if (slotStart < be && slotEnd > bs) { conflict = true; break; }
-        }
+        if (blk.startTime && blk.endTime && slotStart < toMins(blk.endTime) && slotEnd > toMins(blk.startTime)) conflict = true;
       }
       if (!conflict) slots.push(toTime(slotStart));
     }
@@ -500,4 +414,4 @@ export class SqliteStorage implements IStorage {
   }
 }
 
-export const storage = new SqliteStorage();
+export const storage = new SupabaseStorage();
