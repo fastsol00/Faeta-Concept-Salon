@@ -4,7 +4,7 @@
 
 @layer base {
   :root {
-    /* Faeta Concept Salon: black marble, graphite surfaces, warm stone accents */
+    /* Faeta Concept Salon: clean graphite surfaces with warm stone accents */
     --background: 0 0% 3%;              /* #080808 */
     --foreground: 43 31% 94%;           /* #f5f2ea */
 
@@ -45,23 +45,12 @@
     --primary-container: 34 14% 70%;
     --tertiary: 33 9% 62%;
 
-    --marble-body:
-      linear-gradient(135deg, rgba(255,255,255,0.055) 0 1px, transparent 1px 28%),
-      linear-gradient(65deg, transparent 0 42%, rgba(255,255,255,0.035) 43%, transparent 45%),
-      linear-gradient(155deg, transparent 0 52%, rgba(124,114,102,0.12) 53%, transparent 56%),
-      #080808;
-    --marble-page:
-      linear-gradient(135deg, rgba(255,255,255,0.065) 0 1px, transparent 1px 31%),
-      linear-gradient(72deg, transparent 0 42%, rgba(255,255,255,0.04) 43%, transparent 46%),
-      linear-gradient(155deg, transparent 0 55%, rgba(124,114,102,0.16) 56%, transparent 59%),
-      linear-gradient(180deg, #0d0d0d 0%, #050505 100%);
-    --marble-panel-bg:
-      linear-gradient(135deg, rgba(255,255,255,0.08) 0 1px, transparent 1px 36%),
-      linear-gradient(115deg, transparent 0 52%, rgba(124,114,102,0.18) 54%, transparent 58%),
-      rgba(16,16,16,0.94);
-    --glass-bg: rgba(16,16,16,0.78);
+    --marble-body: linear-gradient(180deg, #0d0d0d 0%, #070707 100%);
+    --marble-page: linear-gradient(180deg, #111111 0%, #090909 100%);
+    --marble-panel-bg: rgba(16,16,16,0.96);
+    --glass-bg: rgba(18,18,18,0.94);
     --glass-border: rgba(255,255,255,0.08);
-    --glass-shadow: 0 24px 70px rgba(0,0,0,0.28);
+    --glass-shadow: 0 20px 52px rgba(0,0,0,0.24);
     --theme-ink: #f5f2ea;
     --theme-muted: #a8a29a;
     --theme-accent-readable: #c9c1b6;
@@ -87,23 +76,12 @@
     --input: 30 12% 78%;
     --ring: 30 8% 32%;
 
-    --marble-body:
-      linear-gradient(132deg, rgba(0,0,0,0.105) 0 1px, transparent 1px 27%),
-      linear-gradient(68deg, transparent 0 38%, rgba(0,0,0,0.075) 39%, transparent 42%),
-      linear-gradient(155deg, transparent 0 55%, rgba(0,0,0,0.12) 56%, transparent 59%),
-      linear-gradient(180deg, #fffdf8 0%, #ece8df 100%);
-    --marble-page:
-      linear-gradient(132deg, rgba(0,0,0,0.12) 0 1px, transparent 1px 32%),
-      linear-gradient(71deg, transparent 0 42%, rgba(0,0,0,0.08) 43%, transparent 46%),
-      linear-gradient(155deg, transparent 0 55%, rgba(0,0,0,0.14) 56%, transparent 59%),
-      linear-gradient(180deg, #fffefb 0%, #eee9df 100%);
-    --marble-panel-bg:
-      linear-gradient(135deg, rgba(0,0,0,0.09) 0 1px, transparent 1px 36%),
-      linear-gradient(115deg, transparent 0 52%, rgba(0,0,0,0.12) 54%, transparent 58%),
-      rgba(255,255,255,0.88);
-    --glass-bg: rgba(255,255,255,0.74);
+    --marble-body: linear-gradient(180deg, #faf7f1 0%, #f1ece2 100%);
+    --marble-page: linear-gradient(180deg, #fffdf9 0%, #f3eee5 100%);
+    --marble-panel-bg: rgba(255,255,255,0.94);
+    --glass-bg: rgba(255,255,255,0.92);
     --glass-border: rgba(0,0,0,0.12);
-    --glass-shadow: 0 24px 60px rgba(54,48,42,0.13);
+    --glass-shadow: 0 20px 44px rgba(54,48,42,0.10);
     --theme-ink: #171513;
     --theme-muted: #504a43;
     --theme-accent-readable: #4a433c;
@@ -161,15 +139,15 @@
     background: var(--glass-bg);
     border-color: var(--glass-border);
     box-shadow: var(--glass-shadow);
-    backdrop-filter: blur(18px);
+    backdrop-filter: blur(12px);
   }
 
   .theme-toggle {
     color: var(--theme-ink);
     background: var(--glass-bg);
     border-color: var(--glass-border);
-    box-shadow: 0 12px 28px rgba(0,0,0,0.16);
-    backdrop-filter: blur(18px);
+    box-shadow: 0 10px 24px rgba(0,0,0,0.14);
+    backdrop-filter: blur(12px);
   }
 
   .theme-toggle__track {
