@@ -4,14 +4,12 @@ import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { BRAND_NAME } from "@/lib/brand";
+import { formatDateLabelShort, toLocalDateString } from "@/lib/date";
 import ThemeToggle from "@/components/ThemeToggle";
 import type { Service, Hairstylist } from "@shared/schema";
 
 type Step = 1 | 2 | 3 | 4 | 5 | 6;
-const DAYS_IT = ["Dom","Lun","Mar","Mer","Gio","Ven","Sab"];
 const MONTHS_IT = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
-function fmtDateIT(s: string) { const d = new Date(s+"T12:00:00"); return `${DAYS_IT[d.getDay()]} ${d.getDate()} ${MONTHS_IT[d.getMonth()]}`; }
-function getDateString(d: Date) { return d.toISOString().split("T")[0]; }
 
 export default function BookingPage() {
   const [, setLocation] = useLocation();
@@ -59,11 +57,11 @@ export default function BookingPage() {
     for (let d = 1; d <= daysInMonth; d++) {
       const dt = new Date(year, month, d);
       const dow = dt.getDay();
-      const dateStr = getDateString(dt);
+      const dateStr = toLocalDateString(dt);
       const isPast = dt < today;
       const isClosedDay = dow === 0 || dow === 1;
       const isHoliday = holidayDates.has(dateStr);
-      days.push({ day: d, dateStr, isDisabled: isClosedDay || isPast || isHoliday, isToday: dateStr === getDateString(today), isHoliday });
+      days.push({ day: d, dateStr, isDisabled: isClosedDay || isPast || isHoliday, isToday: dateStr === toLocalDateString(today), isHoliday });
     }
     return days;
   }, [calendarMonth, holidayDates]);
@@ -87,9 +85,7 @@ export default function BookingPage() {
             <h1 className="text-base font-black font-headline text-[#f5f2ea] leading-none">{BRAND_NAME}</h1>
             <span className="text-[10px] text-[#a8a29a] font-medium">Prenotazione Online</span>
           </div>
-          <div className="flex w-12 justify-end">
-            <ThemeToggle compact />
-          </div>
+          <div className="w-12" />
         </div>
         {/* Progress */}
         <div className="px-5 pb-3">
@@ -167,7 +163,7 @@ export default function BookingPage() {
         {step === 3 && (
           <section>
             <h2 className="text-2xl font-extrabold font-headline tracking-tight mb-1">Scegli lo stylist</h2>
-            <p className="text-[#a8a29a] text-sm mb-5">Per {fmtDateIT(selectedDate)}</p>
+            <p className="text-[#a8a29a] text-sm mb-5">Per {formatDateLabelShort(selectedDate)}</p>
             <div className="space-y-3">
               {activeHairstylists.map(h => (
                 <button key={h.id} onClick={() => { setSelectedStylist(h); setSelectedTime(""); setStep(4); }}
@@ -187,7 +183,7 @@ export default function BookingPage() {
         {step === 4 && (
           <section>
             <h2 className="text-2xl font-extrabold font-headline tracking-tight mb-1">Scegli l'orario</h2>
-            <p className="text-[#a8a29a] text-sm mb-5">{fmtDateIT(selectedDate)} · {selectedStylist?.name}</p>
+            <p className="text-[#a8a29a] text-sm mb-5">{formatDateLabelShort(selectedDate)} · {selectedStylist?.name}</p>
             {slotsLoading ? (
               <div className="space-y-3">{[...Array(6)].map((_,i) => <div key={i} className="h-12 bg-[#262626] rounded-xl animate-pulse" />)}</div>
             ) : availableSlots.length === 0 ? (
@@ -255,7 +251,7 @@ export default function BookingPage() {
                 ...(email ? [{icon:"email", label:"Email", value:email}] : []),
                 {icon:"content_cut", label:"Servizio", value:selectedService?.name??""},
                 {icon:"badge", label:"Hairstylist", value:selectedStylist?.name??""},
-                {icon:"calendar_month", label:"Data", value:fmtDateIT(selectedDate)},
+                {icon:"calendar_month", label:"Data", value:formatDateLabelShort(selectedDate)},
                 {icon:"schedule", label:"Orario", value:selectedTime},
                 ...(selectedService && selectedService.price>0 ? [{icon:"payments", label:"Prezzo", value:`€${selectedService.price}`}] : []),
                 ...(notes.trim() ? [{icon:"notes", label:"Note", value:notes}] : []),
@@ -281,7 +277,7 @@ export default function BookingPage() {
           <div className="bg-[#101010]/90 backdrop-blur-xl px-5 pt-4 pb-8 shadow-[0_-10px_40px_rgba(0,0,0,0.08)] rounded-t-[2rem]">
             {step === 6 && (
               <div className="flex items-center justify-between mb-3 px-1">
-                <div><p className="text-[10px] font-bold text-[#a8a29a] uppercase tracking-wider">Orario scelto</p><p className="text-sm font-bold text-[#c9c1b6]">{fmtDateIT(selectedDate)}, {selectedTime}</p></div>
+                <div><p className="text-[10px] font-bold text-[#a8a29a] uppercase tracking-wider">Orario scelto</p><p className="text-sm font-bold text-[#c9c1b6]">{formatDateLabelShort(selectedDate)}, {selectedTime}</p></div>
                 {selectedService && selectedService.price>0 && <div className="text-right"><p className="text-[10px] font-bold text-[#a8a29a] uppercase tracking-wider">Totale</p><p className="text-xl font-black font-headline">€{selectedService.price}</p></div>}
               </div>
             )}
@@ -297,6 +293,9 @@ export default function BookingPage() {
           </div>
         </div>
       )}
+      <div className={`fixed right-5 z-40 ${step >= 5 ? "bottom-32" : "bottom-5"}`}>
+        <ThemeToggle compact />
+      </div>
     </div>
   );
 }

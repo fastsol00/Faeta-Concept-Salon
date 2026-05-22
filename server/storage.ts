@@ -309,7 +309,11 @@ export class SupabaseStorage implements IStorage {
 
   async getHairstylistAvailability(hairstylistId: number) {
     const rows = await this.supabase.select<HairstylistAvailability>("hairstylist_availability", { hairstylist_id: hairstylistId }, "day_of_week.asc");
-    return rows.length ? rows : buildDefaultAvailability(hairstylistId).map((row, index) => ({ ...row, id: -(index + 1) }));
+    const defaults = buildDefaultAvailability(hairstylistId);
+    return defaults.map((fallback, index) => {
+      const saved = rows.find((row) => row.dayOfWeek === fallback.dayOfWeek);
+      return saved ?? { ...fallback, id: -(index + 1) };
+    });
   }
   async upsertHairstylistAvailability(hairstylistId: number, data: InsertHairstylistAvailability[]) {
     const existing = await this.getHairstylistAvailability(hairstylistId);

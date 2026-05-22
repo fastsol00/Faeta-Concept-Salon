@@ -200,7 +200,6 @@
   .theme-light .text-white\/70 { color: var(--theme-muted); }
   .theme-light .text-white\/60 { color: var(--theme-muted); }
   .theme-light .text-white\/80 { color: #332f2a; }
-  .theme-light .text-white { color: #171513; }
   .theme-light .text-red-400 { color: #b42318; }
   .theme-light .placeholder-white\/60::placeholder { color: rgba(80,74,67,0.72); }
 

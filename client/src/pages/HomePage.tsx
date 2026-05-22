@@ -23,29 +23,28 @@ export default function HomePage() {
     <div className="min-h-screen bg-marble flex flex-col">
       {/* Header */}
       <header className="border-b border-white/10 bg-[#101010]/80 backdrop-blur-xl shadow-sm shadow-black/20">
-        <div className="max-w-md mx-auto px-6 py-5 relative">
-          <div className="absolute right-6 top-5 z-10">
-            <ThemeToggle compact />
-          </div>
-          <div className="mb-4 h-24 w-full overflow-hidden rounded-2xl border border-white/10 bg-black shadow-2xl shadow-black/30 pr-14">
-            <img src={faetaLogo} alt={BRAND_NAME} className="h-full w-full object-cover" />
-          </div>
-          <div className="text-center">
-            <h1 className="text-2xl font-black font-headline text-[#f5f2ea] tracking-tight">{BRAND_NAME}</h1>
-            <p className="text-sm text-[#a8a29a] mt-1">{BRAND_HOURS}</p>
-            <p className="text-xs text-[#a8a29a] mt-1">{BRAND_ADDRESS}</p>
+        <div className="max-w-md mx-auto px-6 py-5">
+          <div className="flex items-center gap-4">
+            <div className="h-20 w-24 flex-shrink-0 overflow-hidden rounded-2xl border border-white/10 bg-black shadow-2xl shadow-black/30">
+              <img src={faetaLogo} alt={BRAND_NAME} className="h-full w-full object-cover" />
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-2xl font-black font-headline text-[#f5f2ea] tracking-tight">{BRAND_NAME}</h1>
+              <p className="text-sm text-[#a8a29a] mt-1">{BRAND_HOURS}</p>
+              <p className="text-xs text-[#a8a29a] mt-1">{BRAND_ADDRESS}</p>
+            </div>
           </div>
         </div>
       </header>
 
       <main className="flex-1 max-w-md mx-auto w-full px-6 py-10 flex flex-col gap-4">
-        <div className="mb-2 flex items-center justify-center gap-3 text-center">
+        <div className="mb-2 flex items-center justify-start gap-3 text-left">
           <div className="h-11 w-11 overflow-hidden rounded-2xl border border-white/10 bg-black shadow-lg shadow-black/20">
             <img src={faetaLogo} alt="" className="h-full w-full object-cover" />
           </div>
           <div>
-            <p className="text-left text-base font-black font-headline text-[#f5f2ea]">Cosa vuoi fare?</p>
-            <p className="text-left text-xs text-[#a8a29a]">Prenota o gestisci un appuntamento</p>
+            <p className="text-base font-black font-headline text-[#f5f2ea]">Cosa vuoi fare?</p>
+            <p className="text-sm text-[#a8a29a]">Prenota o gestisci un appuntamento</p>
           </div>
         </div>
 
@@ -58,7 +57,7 @@ export default function HomePage() {
             <span className="material-symbols-outlined text-white text-2xl">calendar_add_on</span>
           </div>
           <h2 className="text-xl font-extrabold font-headline mb-1">Nuova Prenotazione</h2>
-          <p className="text-white/70 text-sm leading-relaxed">Scegli il servizio, la data e l'orario che preferisci.</p>
+          <p className="text-white/80 text-sm leading-relaxed">Scegli il servizio, la data e l'orario che preferisci.</p>
           <div className="flex items-center gap-2 mt-4">
             <span className="text-sm font-bold">Inizia subito</span>
             <span className="material-symbols-outlined text-base">arrow_forward</span>
@@ -116,6 +115,10 @@ export default function HomePage() {
           Accedi alla dashboard admin
         </button>
       </footer>
+
+      <div className="fixed bottom-5 right-5 z-40">
+        <ThemeToggle compact />
+      </div>
     </div>
   );
 }

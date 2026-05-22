@@ -4,23 +4,13 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { BRAND_ADDRESS, BRAND_NAME } from "@/lib/brand";
+import { formatDateLabelCompact, formatDateLabelLong, toLocalDateString } from "@/lib/date";
 import type { Booking, Service, Hairstylist } from "@shared/schema";
 import mapCityImg from "@assets/map-city.jpg";
 
 const MONTHS_IT = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
-const MONTHS_IT_SHORT = ["Gen","Feb","Mar","Apr","Mag","Giu","Lug","Ago","Set","Ott","Nov","Dic"];
-const DAYS_IT = ["Domenica","Lunedì","Martedì","Mercoledì","Giovedì","Venerdì","Sabato"];
-const DAYS_SHORT = ["Dom","Lun","Mar","Mer","Gio","Ven","Sab"];
-
-function fmtDate(d: string) {
-  const dt = new Date(d + "T12:00:00");
-  return `${DAYS_IT[dt.getDay()]}, ${dt.getDate()} ${MONTHS_IT[dt.getMonth()]} ${dt.getFullYear()}`;
-}
-function fmtDateIT(s: string) {
-  const d = new Date(s + "T12:00:00");
-  return `${DAYS_SHORT[d.getDay()]} ${d.getDate()} ${MONTHS_IT_SHORT[d.getMonth()]}`;
-}
-function getDateString(d: Date) { return d.toISOString().split("T")[0]; }
+function fmtDate(d: string) { return formatDateLabelLong(d); }
+function fmtDateIT(s: string) { return formatDateLabelCompact(s); }
 
 const STATUS_LABELS: Record<string, { label: string; cls: string; icon: string }> = {
   confirmed: { label: "Confermata", cls: "bg-green-100 text-green-700", icon: "check_circle" },
@@ -143,11 +133,11 @@ export default function ManageBookingPage() {
     for (let d = 1; d <= daysInMonth; d++) {
       const dt = new Date(year, month, d);
       const dow = dt.getDay();
-      const dateStr = getDateString(dt);
+      const dateStr = toLocalDateString(dt);
       const isPast = dt < today;
       const isClosedDay = dow === 0 || dow === 1;
       const isHoliday = holidayDates.has(dateStr);
-      days.push({ day: d, dateStr, isDisabled: isClosedDay || isPast || isHoliday, isToday: dateStr === getDateString(today), isHoliday });
+      days.push({ day: d, dateStr, isDisabled: isClosedDay || isPast || isHoliday, isToday: dateStr === toLocalDateString(today), isHoliday });
     }
     return days;
   }, [calendarMonth, holidayDates]);
