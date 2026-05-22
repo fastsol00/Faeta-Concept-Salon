@@ -43,13 +43,13 @@ export default function AdminLogin() {
           <div className="mb-5 h-28 w-full overflow-hidden rounded-2xl border border-white/10 bg-black shadow-2xl shadow-black/40">
             <img src={faetaLogo} alt={BRAND_NAME} className="h-full w-full object-cover" />
           </div>
-          <h1 className="text-2xl font-black font-headline text-white tracking-tight">{BRAND_NAME}</h1>
-          <p className="text-sm text-white/70 mt-1">Pannello di amministrazione</p>
+          <h1 className="text-2xl font-black font-headline text-[#f5f2ea] tracking-tight">{BRAND_NAME}</h1>
+          <p className="text-sm text-[#a8a29a] mt-1">Pannello di amministrazione</p>
         </div>
 
         {/* Login card */}
         <form onSubmit={handleLogin} className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8">
-          <h2 className="text-lg font-bold font-headline text-white mb-6">Accedi</h2>
+          <h2 className="text-lg font-bold font-headline text-[#f5f2ea] mb-6">Accedi</h2>
 
           {error && (
             <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 mb-4 flex items-center gap-2">
@@ -60,7 +60,7 @@ export default function AdminLogin() {
 
           <div className="space-y-4">
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-white/70 mb-2">Username</label>
+              <label className="block text-xs font-bold uppercase tracking-wider text-[#a8a29a] mb-2">Username</label>
               <input
                 data-testid="input-username"
                 type="text"
@@ -68,11 +68,11 @@ export default function AdminLogin() {
                 onChange={e => setUsername(e.target.value)}
                 placeholder="admin"
                 required
-                className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3.5 text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-[#7c7266]/50 focus:border-[#7c7266]/50 transition-all"
+                className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3.5 text-[#f5f2ea] placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-[#7c7266]/50 focus:border-[#7c7266]/50 transition-all"
               />
             </div>
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-white/70 mb-2">Password</label>
+              <label className="block text-xs font-bold uppercase tracking-wider text-[#a8a29a] mb-2">Password</label>
               <input
                 data-testid="input-password"
                 type="password"
@@ -80,7 +80,7 @@ export default function AdminLogin() {
                 onChange={e => setPassword(e.target.value)}
                 placeholder="••••••••"
                 required
-                className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3.5 text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-[#7c7266]/50 focus:border-[#7c7266]/50 transition-all"
+                className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3.5 text-[#f5f2ea] placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-[#7c7266]/50 focus:border-[#7c7266]/50 transition-all"
               />
             </div>
           </div>
@@ -98,14 +98,14 @@ export default function AdminLogin() {
             )}
           </button>
 
-          <p className="text-center text-white/70 text-xs mt-4">
+          <p className="text-center text-[#a8a29a] text-xs mt-4">
             Default: admin / admin123
           </p>
         </form>
 
         <button
           onClick={() => setLocation("/")}
-          className="mt-6 w-full text-center text-white/70 text-sm hover:text-white transition-colors"
+          className="mt-6 w-full text-center text-[#a8a29a] text-sm hover:text-[#f5f2ea] transition-colors"
         >
           ← Torna alla prenotazione
         </button>

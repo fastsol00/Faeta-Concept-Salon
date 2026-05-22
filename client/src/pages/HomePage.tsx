@@ -23,21 +23,31 @@ export default function HomePage() {
     <div className="min-h-screen bg-marble flex flex-col">
       {/* Header */}
       <header className="border-b border-white/10 bg-[#101010]/80 backdrop-blur-xl shadow-sm shadow-black/20">
-        <div className="max-w-md mx-auto px-6 py-6 flex flex-col items-center relative">
-          <div className="absolute right-6 top-6 z-10">
+        <div className="max-w-md mx-auto px-6 py-5 relative">
+          <div className="absolute right-6 top-5 z-10">
             <ThemeToggle compact />
           </div>
-          <div className="mb-4 h-24 w-full overflow-hidden rounded-2xl border border-white/10 bg-black shadow-2xl shadow-black/30">
+          <div className="mb-4 h-24 w-full overflow-hidden rounded-2xl border border-white/10 bg-black shadow-2xl shadow-black/30 pr-14">
             <img src={faetaLogo} alt={BRAND_NAME} className="h-full w-full object-cover" />
           </div>
-          <h1 className="text-2xl font-black font-headline text-[#f5f2ea] tracking-tight">{BRAND_NAME}</h1>
-          <p className="text-sm text-[#a8a29a] mt-1">{BRAND_HOURS}</p>
-          <p className="text-xs text-[#a8a29a] mt-1">{BRAND_ADDRESS}</p>
+          <div className="text-center">
+            <h1 className="text-2xl font-black font-headline text-[#f5f2ea] tracking-tight">{BRAND_NAME}</h1>
+            <p className="text-sm text-[#a8a29a] mt-1">{BRAND_HOURS}</p>
+            <p className="text-xs text-[#a8a29a] mt-1">{BRAND_ADDRESS}</p>
+          </div>
         </div>
       </header>
 
       <main className="flex-1 max-w-md mx-auto w-full px-6 py-10 flex flex-col gap-4">
-        <p className="text-center text-[#a8a29a] text-sm mb-2">Cosa vuoi fare?</p>
+        <div className="mb-2 flex items-center justify-center gap-3 text-center">
+          <div className="h-11 w-11 overflow-hidden rounded-2xl border border-white/10 bg-black shadow-lg shadow-black/20">
+            <img src={faetaLogo} alt="" className="h-full w-full object-cover" />
+          </div>
+          <div>
+            <p className="text-left text-base font-black font-headline text-[#f5f2ea]">Cosa vuoi fare?</p>
+            <p className="text-left text-xs text-[#a8a29a]">Prenota o gestisci un appuntamento</p>
+          </div>
+        </div>
 
         {/* Nuova prenotazione */}
         <button
@@ -100,7 +110,7 @@ export default function HomePage() {
         {/* Admin access link */}
         <button
           onClick={() => setLocation("/admin")}
-          className="flex items-center gap-1.5 text-[#a8a29a] text-xs font-medium hover:text-[#a8a29a] transition-colors group"
+          className="flex items-center gap-1.5 text-[#a8a29a] text-xs font-medium hover:text-[#f5f2ea] transition-colors group"
         >
           <span className="material-symbols-outlined text-sm opacity-60 group-hover:opacity-100 transition-opacity">admin_panel_settings</span>
           Accedi alla dashboard admin

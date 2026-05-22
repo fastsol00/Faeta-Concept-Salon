@@ -12,7 +12,7 @@ export default function ThemeToggle({ compact = false }: { compact?: boolean }) 
       aria-label={label}
       title={label}
       className={`theme-toggle inline-flex items-center rounded-full border font-black transition-all hover:scale-[1.02] active:scale-[0.98] ${
-        compact ? "gap-1 px-2 py-1.5 text-[10px]" : "gap-2 px-3 py-2 text-xs"
+        compact ? "gap-1.5 px-2.5 py-1.5 text-[11px]" : "gap-2 px-3 py-2 text-xs"
       }`}
     >
       <span className="theme-toggle__track relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full">
@@ -22,7 +22,7 @@ export default function ThemeToggle({ compact = false }: { compact?: boolean }) 
           }`}
         />
       </span>
-      {!compact && <span>{isLight ? "Bianco" : "Nero"}</span>}
+      <span className={compact ? "hidden sm:inline" : ""}>{isLight ? "Chiaro" : "Scuro"}</span>
       <span className="material-symbols-outlined text-sm">{isLight ? "light_mode" : "dark_mode"}</span>
     </button>
   );

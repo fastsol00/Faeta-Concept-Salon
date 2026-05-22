@@ -36,7 +36,7 @@ export const AdminSessionContext = createContext<AdminSessionCtx>({
 });
 
 export const ThemeContext = createContext<ThemeCtx>({
-  theme: "dark-marble",
+  theme: "light-marble",
   toggleTheme: () => {},
 });
 
@@ -51,8 +51,8 @@ export function useTheme() {
 export default function App() {
   const [session, setSession] = useState<AdminSessionData | null>(null);
   const [theme, setTheme] = useState<ThemeMode>(() => {
-    if (typeof window === "undefined") return "dark-marble";
-    return window.localStorage.getItem("faeta-theme") === "light-marble" ? "light-marble" : "dark-marble";
+    if (typeof window === "undefined") return "light-marble";
+    return window.localStorage.getItem("faeta-theme") === "dark-marble" ? "dark-marble" : "light-marble";
   });
 
   useEffect(() => {
