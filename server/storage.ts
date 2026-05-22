@@ -1,10 +1,13 @@
 import bcrypt from "bcryptjs";
+import pg from "pg";
 import type {
   AdminUser, BlockedSlot, Booking, Client, Hairstylist, HairstylistAvailability,
   Holiday, InsertAdminUser, InsertBlockedSlot, InsertBooking, InsertClient,
   InsertHairstylist, InsertHairstylistAvailability, InsertHoliday, InsertService,
   InsertShopHours, Service, ShopHours,
 } from "@shared/schema";
+
+const { Pool } = pg;
 
 const BRAND_SHOP_NAME = "Faeta Concept Salon";
 const BRAND_SHOP_ADDRESS = "Via Cupa Fosso Del Lupo 136 NA";
@@ -72,7 +75,7 @@ function requiredEnv(name: string) {
 
 function toCamel(row: any): any {
   if (!row || typeof row !== "object") return row;
-  return {
+  const mapped = {
     ...row,
     passwordHash: row.password_hash,
     displayName: row.display_name,
@@ -98,6 +101,11 @@ function toCamel(row: any): any {
     serviceId: row.service_id,
     isNew: row.is_new,
   };
+  for (const key of ["id", "durationMinutes", "dayOfWeek", "hairstylistId", "createdAt", "totalBookings", "clientId", "serviceId"]) {
+    if (mapped[key] !== null && mapped[key] !== undefined) mapped[key] = Number(mapped[key]);
+  }
+  if (mapped.price !== null && mapped.price !== undefined) mapped.price = Number(mapped.price);
+  return mapped;
 }
 
 function toSnake(data: Record<string, any>): Record<string, any> {
@@ -147,110 +155,96 @@ function toTime(m: number) {
   return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
 }
 
-class SupabaseRest {
-  private readonly baseUrl: string;
-  private readonly key: string;
+class PostgresDb {
+  private readonly pool: pg.Pool;
 
   constructor() {
-    this.baseUrl = requiredEnv("SUPABASE_URL").replace(/\/$/, "");
-    this.key = requiredEnv("SUPABASE_SERVICE_ROLE_KEY");
-  }
-
-  private url(table: string, params?: URLSearchParams) {
-    const query = params?.toString();
-    return `${this.baseUrl}/rest/v1/${table}${query ? `?${query}` : ""}`;
-  }
-
-  private async request<T>(table: string, init: RequestInit = {}, params?: URLSearchParams): Promise<T> {
-    const res = await fetch(this.url(table, params), {
-      ...init,
-      headers: {
-        apikey: this.key,
-        Authorization: `Bearer ${this.key}`,
-        "Content-Type": "application/json",
-        ...(init.headers ?? {}),
-      },
+    this.pool = new Pool({
+      connectionString: requiredEnv("DATABASE_URL"),
+      ssl: { rejectUnauthorized: false },
     });
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`Supabase ${res.status}: ${text}`);
-    }
-    if (res.status === 204) return undefined as T;
-    return await res.json() as T;
+  }
+
+  private where(filters: Record<string, FilterValue>, startIndex = 1) {
+    const values: FilterValue[] = [];
+    const clauses = Object.entries(filters).map(([key, value], index) => {
+      if (value === null) return `${key} is null`;
+      values.push(value);
+      return `${key} = $${startIndex + index}`;
+    });
+    return {
+      clause: clauses.length ? ` where ${clauses.join(" and ")}` : "",
+      values,
+    };
+  }
+
+  private async query<T>(sql: string, values: any[] = []) {
+    const result = await this.pool.query(sql, values);
+    return result.rows.map(toCamel) as T[];
   }
 
   async select<T>(table: string, filters: Record<string, FilterValue> = {}, order?: string): Promise<T[]> {
-    const params = new URLSearchParams({ select: "*" });
-    for (const [key, value] of Object.entries(filters)) {
-      if (value === null) params.set(key, "is.null");
-      else params.set(key, `eq.${String(value)}`);
-    }
-    if (order) params.set("order", order);
-    const rows = await this.request<any[]>(table, { method: "GET" }, params);
-    return rows.map(toCamel) as T[];
+    const { clause, values } = this.where(filters);
+    return this.query<T>(`select * from ${table}${clause}${order ? ` order by ${order.replace(".", " ")}` : ""}`, values);
   }
 
   async selectOne<T>(table: string, filters: Record<string, FilterValue>): Promise<T | undefined> {
-    const params = new URLSearchParams({ select: "*", limit: "1" });
-    for (const [key, value] of Object.entries(filters)) {
-      if (value === null) params.set(key, "is.null");
-      else params.set(key, `eq.${String(value)}`);
-    }
-    const rows = await this.request<any[]>(table, { method: "GET" }, params);
-    return rows[0] ? toCamel(rows[0]) as T : undefined;
+    const { clause, values } = this.where(filters);
+    const rows = await this.query<T>(`select * from ${table}${clause} limit 1`, values);
+    return rows[0];
   }
 
   async insert<T>(table: string, data: Record<string, any>): Promise<T> {
-    const rows = await this.request<any[]>(table, {
-      method: "POST",
-      headers: { Prefer: "return=representation" },
-      body: JSON.stringify(toSnake(data)),
-    });
-    return toCamel(rows[0]) as T;
+    const row = toSnake(data);
+    const keys = Object.keys(row);
+    const placeholders = keys.map((_, index) => `$${index + 1}`).join(", ");
+    const columns = keys.join(", ");
+    const rows = await this.query<T>(`insert into ${table} (${columns}) values (${placeholders}) returning *`, Object.values(row));
+    return rows[0];
   }
 
   async insertMany<T>(table: string, data: Record<string, any>[]): Promise<T[]> {
-    const rows = await this.request<any[]>(table, {
-      method: "POST",
-      headers: { Prefer: "return=representation" },
-      body: JSON.stringify(data.map(toSnake)),
-    });
-    return rows.map(toCamel) as T[];
+    const inserted: T[] = [];
+    for (const item of data) inserted.push(await this.insert<T>(table, item));
+    return inserted;
   }
 
   async update<T>(table: string, filters: Record<string, FilterValue>, data: Record<string, any>): Promise<T | undefined> {
-    const params = new URLSearchParams();
-    for (const [key, value] of Object.entries(filters)) params.set(key, `eq.${String(value)}`);
-    const rows = await this.request<any[]>(table, {
-      method: "PATCH",
-      headers: { Prefer: "return=representation" },
-      body: JSON.stringify(toSnake(data)),
-    }, params);
-    return rows[0] ? toCamel(rows[0]) as T : undefined;
+    const row = toSnake(data);
+    const keys = Object.keys(row);
+    if (!keys.length) return this.selectOne<T>(table, filters);
+    const sets = keys.map((key, index) => `${key} = $${index + 1}`).join(", ");
+    const where = this.where(filters, keys.length + 1);
+    const rows = await this.query<T>(`update ${table} set ${sets}${where.clause} returning *`, [...Object.values(row), ...where.values]);
+    return rows[0];
   }
 
   async delete(table: string, filters: Record<string, FilterValue>): Promise<void> {
-    const params = new URLSearchParams();
-    for (const [key, value] of Object.entries(filters)) params.set(key, `eq.${String(value)}`);
-    await this.request<void>(table, { method: "DELETE", headers: { Prefer: "return=minimal" } }, params);
+    const { clause, values } = this.where(filters);
+    await this.pool.query(`delete from ${table}${clause}`, values);
   }
 
   async deleteAll(table: string): Promise<void> {
-    const params = new URLSearchParams({ id: "gte.0" });
-    await this.request<void>(table, { method: "DELETE", headers: { Prefer: "return=minimal" } }, params);
+    await this.pool.query(`delete from ${table}`);
   }
 
   async blocked(hairstylistId?: number, date?: string): Promise<BlockedSlot[]> {
-    const params = new URLSearchParams({ select: "*" });
-    if (date) params.set("date", `eq.${date}`);
-    if (hairstylistId !== undefined) params.set("or", `(hairstylist_id.eq.${hairstylistId},hairstylist_id.is.null)`);
-    const rows = await this.request<any[]>("blocked_slots", { method: "GET" }, params);
-    return rows.map(toCamel) as BlockedSlot[];
+    const clauses: string[] = [];
+    const values: any[] = [];
+    if (date) {
+      values.push(date);
+      clauses.push(`date = $${values.length}`);
+    }
+    if (hairstylistId !== undefined) {
+      values.push(hairstylistId);
+      clauses.push(`(hairstylist_id = $${values.length} or hairstylist_id is null)`);
+    }
+    return this.query<BlockedSlot>(`select * from blocked_slots${clauses.length ? ` where ${clauses.join(" and ")}` : ""}`, values);
   }
 }
 
 export class SupabaseStorage implements IStorage {
-  private readonly supabase = new SupabaseRest();
+  private readonly supabase = new PostgresDb();
 
   async ensureReady() {
     const admin = await this.getAdminByUsername(DEFAULT_ADMIN_USERNAME);
