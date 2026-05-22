@@ -155,6 +155,17 @@ function toTime(m: number) {
   return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
 }
 
+function buildDefaultAvailability(hairstylistId: number): HairstylistAvailability[] {
+  return Array.from({ length: 7 }, (_, dayOfWeek) => ({
+    id: 0,
+    hairstylistId,
+    dayOfWeek,
+    startTime: dayOfWeek === 0 || dayOfWeek === 1 ? null : "08:30",
+    endTime: dayOfWeek === 0 || dayOfWeek === 1 ? null : "20:00",
+    isAvailable: dayOfWeek !== 0 && dayOfWeek !== 1,
+  }));
+}
+
 class PostgresDb {
   private readonly pool: pg.Pool;
 
@@ -274,7 +285,14 @@ export class SupabaseStorage implements IStorage {
 
   getHairstylists() { return this.supabase.select<Hairstylist>("hairstylists"); }
   getHairstylistById(id: number) { return this.supabase.selectOne<Hairstylist>("hairstylists", { id }); }
-  createHairstylist(data: InsertHairstylist) { return this.supabase.insert<Hairstylist>("hairstylists", data); }
+  async createHairstylist(data: InsertHairstylist) {
+    const hairstylist = await this.supabase.insert<Hairstylist>("hairstylists", data);
+    await this.supabase.insertMany<HairstylistAvailability>(
+      "hairstylist_availability",
+      buildDefaultAvailability(hairstylist.id).map(({ id: _id, ...row }) => row),
+    );
+    return hairstylist;
+  }
   updateHairstylist(id: number, data: Partial<InsertHairstylist>) { return this.supabase.update<Hairstylist>("hairstylists", { id }, data); }
   deleteHairstylist(id: number) { return this.supabase.delete("hairstylists", { id }); }
 
@@ -289,8 +307,9 @@ export class SupabaseStorage implements IStorage {
   createHoliday(data: InsertHoliday) { return this.supabase.insert<Holiday>("holidays", data); }
   deleteHoliday(id: number) { return this.supabase.delete("holidays", { id }); }
 
-  getHairstylistAvailability(hairstylistId: number) {
-    return this.supabase.select<HairstylistAvailability>("hairstylist_availability", { hairstylist_id: hairstylistId }, "day_of_week.asc");
+  async getHairstylistAvailability(hairstylistId: number) {
+    const rows = await this.supabase.select<HairstylistAvailability>("hairstylist_availability", { hairstylist_id: hairstylistId }, "day_of_week.asc");
+    return rows.length ? rows : buildDefaultAvailability(hairstylistId).map((row, index) => ({ ...row, id: -(index + 1) }));
   }
   async upsertHairstylistAvailability(hairstylistId: number, data: InsertHairstylistAvailability[]) {
     const existing = await this.getHairstylistAvailability(hairstylistId);
