@@ -5,7 +5,7 @@ import type {
   Holiday, InsertAdminUser, InsertBlockedSlot, InsertBooking, InsertClient,
   InsertHairstylist, InsertHairstylistAvailability, InsertHoliday, InsertService,
   InsertShopHours, Service, ShopHours,
-} from "@shared/schema";
+} from "../shared/schema.js";
 
 const { Pool } = pg;
 

@@ -1,11 +1,10 @@
 import type { Express } from "express";
-import type { Server } from "http";
-import { storage } from "./storage";
+import { storage } from "./storage.js";
 import bcrypt from "bcryptjs";
-import { insertBookingSchema, insertHairstylistSchema, insertHolidaySchema, insertServiceSchema, type Booking } from "@shared/schema";
+import { insertBookingSchema, insertHairstylistSchema, insertHolidaySchema, insertServiceSchema, type Booking } from "../shared/schema.js";
 import { z } from "zod";
 
-export async function registerRoutes(httpServer: Server, app: Express) {
+export async function registerRoutes(app: Express) {
   await storage.ensureReady();
 
   // ── Auth ──────────────────────────────────────────────────────────────────
